@@ -180,3 +180,32 @@ CREATE TABLE personal_sticky_note (
         REFERENCES personal_blackboard (id)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='感触随笔便签';
+
+-- ------------------------------------------------------------
+-- 8. 课程模式：笔记大类 / 笔记（独立于班级日志与个人模式）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS course_category (
+    id          INT             NOT NULL AUTO_INCREMENT COMMENT '笔记大类ID',
+    name        VARCHAR(100)    NOT NULL COMMENT '大类名称',
+    sort_order  INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_course_cat_sort (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程模式笔记大类';
+
+CREATE TABLE IF NOT EXISTS course_note (
+    id            INT             NOT NULL AUTO_INCREMENT COMMENT '笔记ID',
+    category_id   INT             NOT NULL COMMENT '归属大类ID',
+    title         VARCHAR(200)    NOT NULL COMMENT '笔记标题',
+    content_html  MEDIUMTEXT      DEFAULT NULL COMMENT '富文本内容（文字+图片引用）',
+    outline_json  TEXT            DEFAULT NULL COMMENT '标题标记信息（纲要目录）',
+    sort_order    INT             NOT NULL DEFAULT 0 COMMENT '排序',
+    create_time   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_course_note_cat (category_id),
+    CONSTRAINT fk_course_note_cat FOREIGN KEY (category_id)
+        REFERENCES course_category (id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程模式笔记';
