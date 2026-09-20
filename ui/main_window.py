@@ -19,6 +19,7 @@ from ui.moral_widget import MoralStatsWidget
 from ui.mini_todo_widget import MiniTodoWidget
 from ui.components.dissolve_tab_widget import DissolveTabWidget
 from ui.personal import PersonalShellWidget, run_personal_pin_gate
+from ui.course import CourseShellWidget
 from ui.styles import apply_widget_style
 from ui import window_mode
 
@@ -33,12 +34,14 @@ class MainWindow(QMainWindow):
     STACK_FULL = 0
     STACK_MINI = 1
     STACK_PERSONAL = 2
+    STACK_COURSE = 3
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("班级管理系统")
         self.is_mini_mode = False
         self.is_personal_mode = False
+        self.is_course_mode = False
         self._force_close = False
         apply_widget_style(self)
         self._build_ui()
@@ -57,6 +60,10 @@ class MainWindow(QMainWindow):
         self.action_personal = QAction("进入个人模式", self)
         self.action_personal.triggered.connect(self.enter_personal_mode)
         self.toolbar.addAction(self.action_personal)
+
+        self.action_course = QAction("课程模式", self)
+        self.action_course.triggered.connect(self.enter_course_mode)
+        self.toolbar.addAction(self.action_course)
 
         self.toolbar.addSeparator()
         self.action_safe_exit = QAction("安全退出", self)
@@ -104,6 +111,11 @@ class MainWindow(QMainWindow):
         self.personal_widget.quit_requested.connect(self.safe_exit)
         self.stack.addWidget(self.personal_widget)
 
+        # —— 课程模式面板（独立页面，不与个人 / 迷你共用控件）——
+        self.course_widget = CourseShellWidget()
+        self.course_widget.exit_requested.connect(self.exit_course_mode)
+        self.stack.addWidget(self.course_widget)
+
         self.setCentralWidget(self.stack)
 
         status = QStatusBar()
@@ -111,7 +123,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status)
 
     def toggle_window_mode(self):
-        if self.is_personal_mode:
+        if self.is_personal_mode or self.is_course_mode:
             return
         self._apply_layout_by_mode(is_mini_mode=not self.is_mini_mode, initial=False)
 
@@ -119,16 +131,19 @@ class MainWindow(QMainWindow):
         if self.is_personal_mode:
             self.exit_personal_mode()
             return
+        if self.is_course_mode:
+            self.exit_course_mode()
+            return
         self._apply_layout_by_mode(is_mini_mode=False, initial=False)
 
     def switch_to_mini_mode(self):
-        if self.is_personal_mode:
+        if self.is_personal_mode or self.is_course_mode:
             return
         self._apply_layout_by_mode(is_mini_mode=True, initial=False)
 
     def enter_personal_mode(self):
         """PIN 校验通过后隐藏班级控件，加载个人界面（同尺寸）。"""
-        if self.is_personal_mode:
+        if self.is_personal_mode or self.is_course_mode:
             return
         if self.is_mini_mode:
             self.switch_to_full_mode()
@@ -141,6 +156,7 @@ class MainWindow(QMainWindow):
             self.full_panel.hide()
             self.tabs.hide()
             self.mini_widget.hide()
+            self.course_widget.hide()
             self.toolbar.hide()
             self.statusBar().hide()
             self.personal_widget.show()
@@ -160,10 +176,52 @@ class MainWindow(QMainWindow):
         try:
             self.is_personal_mode = False
             self.personal_widget.hide()
+            self.course_widget.hide()
             self.setWindowTitle("班级管理系统")
             # 回到完整大屏班级界面
             self._apply_layout_by_mode(is_mini_mode=False, initial=False)
             self.statusBar().showMessage("已退出个人模式", 3000)
+        finally:
+            self.setUpdatesEnabled(True)
+
+    def enter_course_mode(self):
+        """进入课程模式：独立页面，窗口尺寸与主界面一致。"""
+        if self.is_course_mode or self.is_personal_mode or self.is_mini_mode:
+            return
+        self.setUpdatesEnabled(False)
+        try:
+            self.is_course_mode = True
+            self.home_widget.pause_weather_network()
+            self.full_panel.hide()
+            self.tabs.hide()
+            self.mini_widget.hide()
+            self.personal_widget.hide()
+            self.toolbar.hide()
+            self.statusBar().hide()
+            self.course_widget.show()
+            self.stack.setCurrentIndex(self.STACK_COURSE)
+            self.setFixedSize(window_mode.FULL_WIDTH, window_mode.FULL_HEIGHT)
+            self.setWindowTitle("课程模式")
+            self.course_widget.on_enter()
+            self.show()
+        finally:
+            self.setUpdatesEnabled(True)
+
+    def exit_course_mode(self):
+        """退出课程模式，先落库再回到班级主界面。"""
+        if not self.is_course_mode:
+            return
+        try:
+            self.course_widget.flush()
+        except Exception:
+            pass
+        self.setUpdatesEnabled(False)
+        try:
+            self.is_course_mode = False
+            self.course_widget.hide()
+            self.setWindowTitle("班级管理系统")
+            self._apply_layout_by_mode(is_mini_mode=False, initial=False)
+            self.statusBar().showMessage("已退出课程模式", 3000)
         finally:
             self.setUpdatesEnabled(True)
 
@@ -200,6 +258,7 @@ class MainWindow(QMainWindow):
 
         self.mini_widget.hide()
         self.personal_widget.hide()
+        self.course_widget.hide()
         self.full_panel.show()
         self.stack.setCurrentIndex(self.STACK_FULL)
 
@@ -211,6 +270,7 @@ class MainWindow(QMainWindow):
         self.statusBar().show()
         self.action_toggle.setText("切换迷你模式")
         self.action_personal.setVisible(True)
+        self.action_course.setVisible(True)
 
         self.setFixedSize(window_mode.FULL_WIDTH, window_mode.FULL_HEIGHT)
         self.setMaximumSize(16777215, 16777215)
@@ -251,6 +311,7 @@ class MainWindow(QMainWindow):
         self.toolbar.hide()
         self.statusBar().hide()
         self.personal_widget.hide()
+        self.course_widget.hide()
 
         self.mini_widget.show()
         self.stack.setCurrentIndex(self.STACK_MINI)
@@ -305,7 +366,7 @@ class MainWindow(QMainWindow):
         super().changeEvent(event)
         if event.type() != QEvent.Type.WindowStateChange:
             return
-        if self.is_mini_mode or self.is_personal_mode:
+        if self.is_mini_mode or self.is_personal_mode or self.is_course_mode:
             return
         # 大屏还原时锁回固定尺寸
         if not self.isMaximized():
@@ -314,7 +375,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if self.is_personal_mode:
+        if self.is_personal_mode or self.is_course_mode:
             if self.width() != window_mode.FULL_WIDTH or self.height() != window_mode.FULL_HEIGHT:
                 self.setFixedSize(window_mode.FULL_WIDTH, window_mode.FULL_HEIGHT)
             return
@@ -386,6 +447,10 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             self._force_close = True
+        try:
+            self.course_widget.flush()
+        except Exception:
+            pass
         self._shutdown_resources()
         super().closeEvent(event)
 

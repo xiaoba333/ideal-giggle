@@ -41,7 +41,9 @@ def main():
         from dao.todo_dao import ensure_schema as ensure_todo_schema
         from dao.personal_dao import ensure_schema as ensure_personal_schema
         from dao.essay_dao import ensure_schema as ensure_essay_schema
+        from dao.course_dao import ensure_schema as ensure_course_schema
         from utils.personal_image_util import ensure_personal_images_dir
+        from utils.course_image_util import ensure_course_images_dir
         execute_query("SELECT 1 AS ok")
         ensure_settings_schema()
         ensure_student_schema()
@@ -50,7 +52,9 @@ def main():
         ensure_todo_schema()
         ensure_personal_schema()
         ensure_essay_schema()
+        ensure_course_schema()
         ensure_personal_images_dir()
+        ensure_course_images_dir()
     except Exception as e:
         styled_critical(
             None,
